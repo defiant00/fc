@@ -1,5 +1,5 @@
 const std = @import("std");
-const c = @cImport({
+const sdl = @cImport({
     @cInclude("SDL.h");
 });
 
@@ -7,6 +7,9 @@ const RENDER_WIDTH = 512;
 const RENDER_HEIGHT = 256;
 const RENDER_FPS = 60;
 const RENDER_TICKS_PER_FRAME = 1000 / RENDER_FPS;
+
+const VRAM_WIDTH = 1024;
+const VRAM_HEIGHT = 1024;
 
 fn color(r: u5, g: u5, b: u5, a: u1) u16 {
     return r | (@as(u16, g) << 5) | (@as(u16, b) << 10) | (@as(u16, a) << 15);
@@ -20,35 +23,35 @@ pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     var alloc = gpa.allocator();
 
-    if (c.SDL_Init(c.SDL_INIT_VIDEO) != 0) {
-        c.SDL_Log("Unable to init SDL: %s", c.SDL_GetError());
+    if (sdl.SDL_Init(sdl.SDL_INIT_VIDEO) != 0) {
+        sdl.SDL_Log("Unable to init SDL: %s", sdl.SDL_GetError());
         return error.SDLInitializationFailed;
     }
-    defer c.SDL_Quit();
+    defer sdl.SDL_Quit();
 
-    const window = c.SDL_CreateWindow(
+    const window = sdl.SDL_CreateWindow(
         "Fantasy Console Test",
-        c.SDL_WINDOWPOS_CENTERED,
-        c.SDL_WINDOWPOS_CENTERED,
+        sdl.SDL_WINDOWPOS_CENTERED,
+        sdl.SDL_WINDOWPOS_CENTERED,
         RENDER_WIDTH,
         RENDER_HEIGHT,
-        c.SDL_WINDOW_RESIZABLE,
+        sdl.SDL_WINDOW_RESIZABLE,
     ) orelse {
-        c.SDL_Log("Unable to create window: %s", c.SDL_GetError());
+        sdl.SDL_Log("Unable to create window: %s", sdl.SDL_GetError());
         return error.SDLInitializationFailed;
     };
-    defer c.SDL_DestroyWindow(window);
+    defer sdl.SDL_DestroyWindow(window);
 
-    const renderer = c.SDL_CreateRenderer(window, -1, 0) orelse {
-        c.SDL_Log("Unable to create renderer: %s", c.SDL_GetError());
+    const renderer = sdl.SDL_CreateRenderer(window, -1, 0) orelse {
+        sdl.SDL_Log("Unable to create renderer: %s", sdl.SDL_GetError());
         return error.SDLInitializationFailed;
     };
-    defer c.SDL_DestroyRenderer(renderer);
+    defer sdl.SDL_DestroyRenderer(renderer);
 
-    var vram = try alloc.alloc(u16, 1024 * 1024);
+    var vram = try alloc.alloc(u16, VRAM_WIDTH * VRAM_HEIGHT);
     defer alloc.free(vram);
 
-    for (0..(1024 * 1024)) |i| {
+    for (0..(VRAM_WIDTH * VRAM_HEIGHT)) |i| {
         const br: u5 = @intCast(i % 32);
         vram[i] = color(br, br, br, 1);
     }
@@ -56,34 +59,34 @@ pub fn main() !void {
     var title_buf: [32]u8 = undefined;
 
     main_loop: while (true) {
-        const prior_ticks = c.SDL_GetTicks64();
+        const prior_ticks = sdl.SDL_GetTicks64();
 
-        var event: c.SDL_Event = undefined;
-        while (c.SDL_PollEvent(&event) != 0) {
+        var event: sdl.SDL_Event = undefined;
+        while (sdl.SDL_PollEvent(&event) != 0) {
             switch (event.type) {
-                c.SDL_QUIT => break :main_loop,
+                sdl.SDL_QUIT => break :main_loop,
                 else => {},
             }
         }
 
-        if (c.SDL_SetRenderDrawColor(renderer, 64, 64, 64, 255) != 0) {
-            c.SDL_Log("Unable to set render color: %s", c.SDL_GetError());
+        if (sdl.SDL_SetRenderDrawColor(renderer, 64, 64, 64, 255) != 0) {
+            sdl.SDL_Log("Unable to set render color: %s", sdl.SDL_GetError());
             return error.SDLError;
         }
-        if (c.SDL_RenderClear(renderer) != 0) {
-            c.SDL_Log("Unable to clear render: %s", c.SDL_GetError());
+        if (sdl.SDL_RenderClear(renderer) != 0) {
+            sdl.SDL_Log("Unable to clear render: %s", sdl.SDL_GetError());
             return error.SDLError;
         }
-        c.SDL_RenderPresent(renderer);
+        sdl.SDL_RenderPresent(renderer);
 
         // run at a fixed 60 fps
-        const elapsed_ticks: u32 = @intCast(c.SDL_GetTicks64() - prior_ticks);
+        const elapsed_ticks: u32 = @intCast(sdl.SDL_GetTicks64() - prior_ticks);
 
         _ = try std.fmt.bufPrint(&title_buf, "Target: {d} Actual: {d}\x00", .{ RENDER_TICKS_PER_FRAME, elapsed_ticks });
-        c.SDL_SetWindowTitle(window, &title_buf);
+        sdl.SDL_SetWindowTitle(window, &title_buf);
 
         if (elapsed_ticks < RENDER_TICKS_PER_FRAME) {
-            c.SDL_Delay(RENDER_TICKS_PER_FRAME - elapsed_ticks);
+            sdl.SDL_Delay(RENDER_TICKS_PER_FRAME - elapsed_ticks);
         }
     }
 }
