@@ -22,7 +22,7 @@ pub fn main() !void {
             }
         }
 
-        try sdl_inst.toVram();
+        try sdl_inst.toFramebuffer();
         try sdl_inst.setColor(7, 7, 7, 1);
         try sdl_inst.clear();
 
@@ -32,7 +32,7 @@ pub fn main() !void {
         try sdl_inst.setColor(0, 0, 0, 1);
         try sdl_inst.clear();
 
-        try sdl_inst.copyVram();
+        try sdl_inst.renderFramebuffer();
         sdl_inst.present();
 
         // run at a fixed 60 fps

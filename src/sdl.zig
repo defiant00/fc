@@ -10,12 +10,12 @@ const RENDER_HEIGHT = 256;
 const RENDER_FPS = 60;
 const RENDER_TICKS_PER_FRAME = 1000 / RENDER_FPS;
 
-const VRAM_WIDTH = 512;
-const VRAM_HEIGHT = 2048;
+const FRAMEBUFFER_WIDTH = 512;
+const FRAMEBUFFER_HEIGHT = 1024;
 
 window: ?*sdl.SDL_Window,
 renderer: ?*sdl.SDL_Renderer,
-vram: ?*sdl.SDL_Texture,
+framebuffer: ?*sdl.SDL_Texture,
 ticks_start: u64,
 
 pub fn init() !Self {
@@ -41,12 +41,12 @@ pub fn init() !Self {
         return error.SDLInitializationFailed;
     };
 
-    const vram = sdl.SDL_CreateTexture(
+    const framebuffer = sdl.SDL_CreateTexture(
         renderer,
         sdl.SDL_PIXELFORMAT_ARGB8888,
         sdl.SDL_TEXTUREACCESS_TARGET,
-        VRAM_WIDTH,
-        VRAM_HEIGHT,
+        FRAMEBUFFER_WIDTH,
+        FRAMEBUFFER_HEIGHT,
     ) orelse {
         sdl.SDL_Log("Unable to create texture: %s", sdl.SDL_GetError());
         return error.SDLInitializationFailed;
@@ -55,13 +55,13 @@ pub fn init() !Self {
     return .{
         .window = window,
         .renderer = renderer,
-        .vram = vram,
+        .framebuffer = framebuffer,
         .ticks_start = 0,
     };
 }
 
 pub fn deinit(self: Self) void {
-    if (self.vram) |vram| sdl.SDL_DestroyTexture(vram);
+    if (self.framebuffer) |framebuffer| sdl.SDL_DestroyTexture(framebuffer);
     if (self.renderer) |renderer| sdl.SDL_DestroyRenderer(renderer);
     if (self.window) |window| sdl.SDL_DestroyWindow(window);
     sdl.SDL_Quit();
@@ -90,9 +90,9 @@ pub fn clear(self: Self) !void {
     }
 }
 
-pub fn copyVram(self: Self) !void {
-    if (sdl.SDL_RenderCopy(self.renderer, self.vram, null, null) != 0) {
-        sdl.SDL_Log("Unable to render from vram: %s", sdl.SDL_GetError());
+pub fn renderFramebuffer(self: Self) !void {
+    if (sdl.SDL_RenderCopy(self.renderer, self.framebuffer, null, null) != 0) {
+        sdl.SDL_Log("Unable to render framebuffer: %s", sdl.SDL_GetError());
         return error.SDLError;
     }
 }
@@ -127,8 +127,8 @@ pub fn frameEndPrintTiming(self: Self) !void {
     }
 }
 
-pub fn toVram(self: Self) !void {
-    if (sdl.SDL_SetRenderTarget(self.renderer, self.vram) != 0) {
+pub fn toFramebuffer(self: Self) !void {
+    if (sdl.SDL_SetRenderTarget(self.renderer, self.framebuffer) != 0) {
         sdl.SDL_Log("Unable to set render target to vram: %s", sdl.SDL_GetError());
         return error.SDLError;
     }
@@ -143,5 +143,5 @@ pub fn toScreen(self: Self) !void {
 
 pub fn testDraw(self: Self) !void {
     try self.setColor(10, 3, 25, 1);
-    _ = sdl.SDL_RenderFillRect(self.renderer, &sdl.SDL_Rect{ .x = 30, .y = 200, .w = 60, .h = 250 });
+    _ = sdl.SDL_RenderFillRect(self.renderer, &sdl.SDL_Rect{ .x = 30, .y = 200, .w = 60, .h = 240 });
 }
