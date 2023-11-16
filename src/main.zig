@@ -11,15 +11,19 @@ pub fn main() !void {
     var sdl_inst = try sdl.init();
     defer sdl_inst.deinit();
 
-    main_loop: while (true) {
-        sdl_inst.frameStart();
+    var running = true;
+    var event: sdl_lib.SDL_Event = undefined;
 
-        var event: sdl_lib.SDL_Event = undefined;
+    while (running) {
         while (sdl_lib.SDL_PollEvent(&event) != 0) {
             switch (event.type) {
-                sdl_lib.SDL_QUIT => break :main_loop,
+                sdl_lib.SDL_QUIT => running = false,
                 else => {},
             }
+        }
+
+        if (sdl_inst.step()) {
+            // todo
         }
 
         try sdl_inst.toFramebuffer();
@@ -34,9 +38,5 @@ pub fn main() !void {
 
         try sdl_inst.renderFramebuffer();
         sdl_inst.present();
-
-        // run at a fixed 60 fps
-        // sdl_inst.frameEnd();
-        try sdl_inst.frameEndPrintTiming();
     }
 }
