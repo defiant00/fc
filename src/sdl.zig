@@ -16,6 +16,8 @@ window: ?*sdl.SDL_Window,
 renderer: ?*sdl.SDL_Renderer,
 framebuffer: ?*sdl.SDL_Texture,
 frame: u64,
+fullscreen: bool,
+screen_rect: sdl.SDL_Rect,
 
 pub fn init() !Self {
     if (sdl.SDL_Init(sdl.SDL_INIT_VIDEO) != 0) {
@@ -56,6 +58,8 @@ pub fn init() !Self {
         .renderer = renderer,
         .framebuffer = framebuffer,
         .frame = getFrame(),
+        .fullscreen = false,
+        .screen_rect = sdl.SDL_Rect{ .x = 0, .y = 0, .w = RENDER_WIDTH, .h = RENDER_HEIGHT },
     };
 }
 
@@ -85,6 +89,42 @@ pub fn clear(self: Self) !void {
     }
 }
 
+pub fn present(self: Self) void {
+    sdl.SDL_RenderPresent(self.renderer);
+}
+
+pub fn renderFramebuffer(self: Self) !void {
+    if (sdl.SDL_RenderCopy(
+        self.renderer,
+        self.framebuffer,
+        &sdl.SDL_Rect{ .x = 0, .y = 0, .w = 512, .h = 256 },
+        &self.screen_rect,
+    ) != 0) {
+        sdl.SDL_Log("Unable to render framebuffer: %s", sdl.SDL_GetError());
+        return error.SDLError;
+    }
+}
+
+pub fn resize(self: *Self, x: i32, y: i32) void {
+    const fx: f64 = @floatFromInt(x);
+    const fy: f64 = @floatFromInt(y);
+    const scale = @min(fx / RENDER_WIDTH, fy / RENDER_HEIGHT);
+
+    self.screen_rect.x = @intFromFloat((fx - (scale * RENDER_WIDTH)) / 2);
+    self.screen_rect.y = @intFromFloat((fy - (scale * RENDER_HEIGHT)) / 2);
+
+    self.screen_rect.w = @intFromFloat(scale * RENDER_WIDTH);
+    self.screen_rect.h = @intFromFloat(scale * RENDER_HEIGHT);
+}
+
+pub fn setColor(self: Self, r: u5, g: u5, b: u5, a: u1) !void {
+    const alpha: u8 = if (a > 0) 0xff else 0;
+    if (sdl.SDL_SetRenderDrawColor(self.renderer, toByte(r), toByte(g), toByte(b), alpha) != 0) {
+        sdl.SDL_Log("Unable to set color: %s", sdl.SDL_GetError());
+        return error.SDLError;
+    }
+}
+
 pub fn step(self: *Self) bool {
     const cur_frame = getFrame();
     const frame_diff = cur_frame - self.frame;
@@ -99,28 +139,11 @@ pub fn step(self: *Self) bool {
     return false;
 }
 
-pub fn present(self: Self) void {
-    sdl.SDL_RenderPresent(self.renderer);
-}
-
-pub fn renderFramebuffer(self: Self) !void {
-    if (sdl.SDL_RenderCopy(self.renderer, self.framebuffer, null, null) != 0) {
-        sdl.SDL_Log("Unable to render framebuffer: %s", sdl.SDL_GetError());
-        return error.SDLError;
-    }
-}
-
-pub fn setColor(self: Self, r: u5, g: u5, b: u5, a: u1) !void {
-    const alpha: u8 = if (a > 0) 0xff else 0;
-    if (sdl.SDL_SetRenderDrawColor(self.renderer, toByte(r), toByte(g), toByte(b), alpha) != 0) {
-        sdl.SDL_Log("Unable to set color: %s", sdl.SDL_GetError());
-        return error.SDLError;
-    }
-}
-
 pub fn testDraw(self: Self) !void {
     try self.setColor(10, 3, 25, 1);
-    _ = sdl.SDL_RenderFillRect(self.renderer, &sdl.SDL_Rect{ .x = 30, .y = 200, .w = 60, .h = 240 });
+    _ = sdl.SDL_RenderDrawRect(self.renderer, &sdl.SDL_Rect{ .x = 1, .y = 1, .w = 256, .h = 128 });
+    try self.setColor(31, 3, 15, 1);
+    _ = sdl.SDL_RenderDrawRect(self.renderer, &sdl.SDL_Rect{ .x = 0, .y = 0, .w = 512, .h = 256 });
 }
 
 pub fn toFramebuffer(self: Self) !void {
@@ -133,6 +156,17 @@ pub fn toFramebuffer(self: Self) !void {
 pub fn toScreen(self: Self) !void {
     if (sdl.SDL_SetRenderTarget(self.renderer, null) != 0) {
         sdl.SDL_Log("Unable to set render target to window: %s", sdl.SDL_GetError());
+        return error.SDLError;
+    }
+}
+
+pub fn toggleFullscreen(self: *Self) !void {
+    self.fullscreen = !self.fullscreen;
+    if (sdl.SDL_SetWindowFullscreen(
+        self.window,
+        if (self.fullscreen) sdl.SDL_WINDOW_FULLSCREEN_DESKTOP else 0,
+    ) != 0) {
+        sdl.SDL_Log("Unable to toggle fullscreen: %s", sdl.SDL_GetError());
         return error.SDLError;
     }
 }

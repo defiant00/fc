@@ -17,6 +17,20 @@ pub fn main() !void {
     while (running) {
         while (sdl_lib.SDL_PollEvent(&event) != 0) {
             switch (event.type) {
+                sdl_lib.SDL_KEYDOWN => {
+                    if (event.key.keysym.sym == sdl_lib.SDLK_RETURN and
+                        (event.key.keysym.mod & sdl_lib.KMOD_ALT) > 0)
+                    {
+                        try sdl_inst.toggleFullscreen();
+                    }
+                },
+                sdl_lib.SDL_WINDOWEVENT => {
+                    if (event.window.event == sdl_lib.SDL_WINDOWEVENT_SIZE_CHANGED) {
+                        const x = event.window.data1;
+                        const y = event.window.data2;
+                        sdl_inst.resize(x, y);
+                    }
+                },
                 sdl_lib.SDL_QUIT => running = false,
                 else => {},
             }
