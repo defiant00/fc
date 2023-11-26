@@ -1,8 +1,6 @@
 const std = @import("std");
+const Color = @import("Color.zig");
 const sdl = @import("sdl.zig");
-const sdl_lib = @cImport({
-    @cInclude("SDL.h");
-});
 
 pub fn main() !void {
     // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -12,26 +10,26 @@ pub fn main() !void {
     defer sdl_inst.deinit();
 
     var running = true;
-    var event: sdl_lib.SDL_Event = undefined;
+    var event: sdl.lib.SDL_Event = undefined;
 
     while (running) {
-        while (sdl_lib.SDL_PollEvent(&event) != 0) {
+        while (sdl.lib.SDL_PollEvent(&event) != 0) {
             switch (event.type) {
-                sdl_lib.SDL_KEYDOWN => {
-                    if (event.key.keysym.sym == sdl_lib.SDLK_RETURN and
-                        (event.key.keysym.mod & sdl_lib.KMOD_ALT) > 0)
+                sdl.lib.SDL_KEYDOWN => {
+                    if (event.key.keysym.sym == sdl.lib.SDLK_RETURN and
+                        (event.key.keysym.mod & sdl.lib.KMOD_ALT) > 0)
                     {
                         try sdl_inst.toggleFullscreen();
                     }
                 },
-                sdl_lib.SDL_WINDOWEVENT => {
-                    if (event.window.event == sdl_lib.SDL_WINDOWEVENT_SIZE_CHANGED) {
+                sdl.lib.SDL_WINDOWEVENT => {
+                    if (event.window.event == sdl.lib.SDL_WINDOWEVENT_SIZE_CHANGED) {
                         const x = event.window.data1;
                         const y = event.window.data2;
                         sdl_inst.resize(x, y);
                     }
                 },
-                sdl_lib.SDL_QUIT => running = false,
+                sdl.lib.SDL_QUIT => running = false,
                 else => {},
             }
         }
@@ -41,15 +39,11 @@ pub fn main() !void {
         }
 
         try sdl_inst.toFramebuffer();
-        try sdl_inst.setColor(7, 7, 7, 1);
-        try sdl_inst.clear();
-
         try sdl_inst.testDraw();
 
         try sdl_inst.toScreen();
-        try sdl_inst.setColor(0, 0, 0, 1);
+        try sdl_inst.setColor(Color.black);
         try sdl_inst.clear();
-
         try sdl_inst.renderFramebuffer();
         sdl_inst.present();
     }

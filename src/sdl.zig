@@ -1,5 +1,6 @@
 const std = @import("std");
-const sdl = @cImport({
+const Color = @import("Color.zig");
+pub const lib = @cImport({
     @cInclude("SDL.h");
 });
 
@@ -12,44 +13,44 @@ const RENDER_FPS = 60;
 const FRAMEBUFFER_WIDTH = 512;
 const FRAMEBUFFER_HEIGHT = 1024;
 
-window: ?*sdl.SDL_Window,
-renderer: ?*sdl.SDL_Renderer,
-framebuffer: ?*sdl.SDL_Texture,
+window: ?*lib.SDL_Window,
+renderer: ?*lib.SDL_Renderer,
+framebuffer: ?*lib.SDL_Texture,
 frame: u64,
 fullscreen: bool,
-screen_rect: sdl.SDL_Rect,
+screen_rect: lib.SDL_Rect,
 
 pub fn init() !Self {
-    if (sdl.SDL_Init(sdl.SDL_INIT_VIDEO) != 0) {
-        sdl.SDL_Log("Unable to init SDL: %s", sdl.SDL_GetError());
+    if (lib.SDL_Init(lib.SDL_INIT_VIDEO) != 0) {
+        lib.SDL_Log("Unable to init SDL: %s", lib.SDL_GetError());
         return error.SDLInitializationFailed;
     }
 
-    const window = sdl.SDL_CreateWindow(
+    const window = lib.SDL_CreateWindow(
         "Fantasy Console Test",
-        sdl.SDL_WINDOWPOS_CENTERED,
-        sdl.SDL_WINDOWPOS_CENTERED,
+        lib.SDL_WINDOWPOS_CENTERED,
+        lib.SDL_WINDOWPOS_CENTERED,
         RENDER_WIDTH,
         RENDER_HEIGHT,
-        sdl.SDL_WINDOW_RESIZABLE,
+        lib.SDL_WINDOW_RESIZABLE,
     ) orelse {
-        sdl.SDL_Log("Unable to create window: %s", sdl.SDL_GetError());
+        lib.SDL_Log("Unable to create window: %s", lib.SDL_GetError());
         return error.SDLInitializationFailed;
     };
 
-    const renderer = sdl.SDL_CreateRenderer(window, -1, sdl.SDL_RENDERER_PRESENTVSYNC) orelse {
-        sdl.SDL_Log("Unable to create renderer: %s", sdl.SDL_GetError());
+    const renderer = lib.SDL_CreateRenderer(window, -1, lib.SDL_RENDERER_PRESENTVSYNC) orelse {
+        lib.SDL_Log("Unable to create renderer: %s", lib.SDL_GetError());
         return error.SDLInitializationFailed;
     };
 
-    const framebuffer = sdl.SDL_CreateTexture(
+    const framebuffer = lib.SDL_CreateTexture(
         renderer,
-        sdl.SDL_PIXELFORMAT_ARGB8888,
-        sdl.SDL_TEXTUREACCESS_TARGET,
+        lib.SDL_PIXELFORMAT_ARGB8888,
+        lib.SDL_TEXTUREACCESS_TARGET,
         FRAMEBUFFER_WIDTH,
         FRAMEBUFFER_HEIGHT,
     ) orelse {
-        sdl.SDL_Log("Unable to create texture: %s", sdl.SDL_GetError());
+        lib.SDL_Log("Unable to create texture: %s", lib.SDL_GetError());
         return error.SDLInitializationFailed;
     };
 
@@ -59,48 +60,40 @@ pub fn init() !Self {
         .framebuffer = framebuffer,
         .frame = getFrame(),
         .fullscreen = false,
-        .screen_rect = sdl.SDL_Rect{ .x = 0, .y = 0, .w = RENDER_WIDTH, .h = RENDER_HEIGHT },
+        .screen_rect = lib.SDL_Rect{ .x = 0, .y = 0, .w = RENDER_WIDTH, .h = RENDER_HEIGHT },
     };
 }
 
 pub fn deinit(self: Self) void {
-    if (self.framebuffer) |framebuffer| sdl.SDL_DestroyTexture(framebuffer);
-    if (self.renderer) |renderer| sdl.SDL_DestroyRenderer(renderer);
-    if (self.window) |window| sdl.SDL_DestroyWindow(window);
-    sdl.SDL_Quit();
+    if (self.framebuffer) |framebuffer| lib.SDL_DestroyTexture(framebuffer);
+    if (self.renderer) |renderer| lib.SDL_DestroyRenderer(renderer);
+    if (self.window) |window| lib.SDL_DestroyWindow(window);
+    lib.SDL_Quit();
 }
 
 fn getFrame() u64 {
-    return sdl.SDL_GetTicks64() * RENDER_FPS / 1000;
-}
-
-fn toByte(val: u5) u8 {
-    return (@as(u8, val) << 3) | (val >> 2);
-}
-
-fn toColor(r: u5, g: u5, b: u5, a: u1) u16 {
-    return r | (@as(u16, g) << 5) | (@as(u16, b) << 10) | (@as(u16, a) << 15);
+    return lib.SDL_GetTicks64() * RENDER_FPS / 1000;
 }
 
 pub fn clear(self: Self) !void {
-    if (sdl.SDL_RenderClear(self.renderer) != 0) {
-        sdl.SDL_Log("Unable to clear render: %s", sdl.SDL_GetError());
+    if (lib.SDL_RenderClear(self.renderer) != 0) {
+        lib.SDL_Log("Unable to clear render: %s", lib.SDL_GetError());
         return error.SDLError;
     }
 }
 
 pub fn present(self: Self) void {
-    sdl.SDL_RenderPresent(self.renderer);
+    lib.SDL_RenderPresent(self.renderer);
 }
 
 pub fn renderFramebuffer(self: Self) !void {
-    if (sdl.SDL_RenderCopy(
+    if (lib.SDL_RenderCopy(
         self.renderer,
         self.framebuffer,
-        &sdl.SDL_Rect{ .x = 0, .y = 0, .w = 512, .h = 256 },
+        &lib.SDL_Rect{ .x = 0, .y = 0, .w = RENDER_WIDTH, .h = RENDER_HEIGHT },
         &self.screen_rect,
     ) != 0) {
-        sdl.SDL_Log("Unable to render framebuffer: %s", sdl.SDL_GetError());
+        lib.SDL_Log("Unable to render framebuffer: %s", lib.SDL_GetError());
         return error.SDLError;
     }
 }
@@ -117,10 +110,9 @@ pub fn resize(self: *Self, x: i32, y: i32) void {
     self.screen_rect.h = @intFromFloat(scale * RENDER_HEIGHT);
 }
 
-pub fn setColor(self: Self, r: u5, g: u5, b: u5, a: u1) !void {
-    const alpha: u8 = if (a > 0) 0xff else 0;
-    if (sdl.SDL_SetRenderDrawColor(self.renderer, toByte(r), toByte(g), toByte(b), alpha) != 0) {
-        sdl.SDL_Log("Unable to set color: %s", sdl.SDL_GetError());
+pub fn setColor(self: Self, c: Color) !void {
+    if (lib.SDL_SetRenderDrawColor(self.renderer, c.r, c.g, c.b, c.a) != 0) {
+        lib.SDL_Log("Unable to set color: %s", lib.SDL_GetError());
         return error.SDLError;
     }
 }
@@ -140,33 +132,46 @@ pub fn step(self: *Self) bool {
 }
 
 pub fn testDraw(self: Self) !void {
-    try self.setColor(10, 3, 25, 1);
-    _ = sdl.SDL_RenderDrawRect(self.renderer, &sdl.SDL_Rect{ .x = 1, .y = 1, .w = 256, .h = 128 });
-    try self.setColor(31, 3, 15, 1);
-    _ = sdl.SDL_RenderDrawRect(self.renderer, &sdl.SDL_Rect{ .x = 0, .y = 0, .w = 512, .h = 256 });
+    try self.setColor(Color.from555(7, 7, 7));
+    try self.clear();
+
+    try self.setColor(Color.pico8[12]);
+    _ = lib.SDL_RenderDrawRect(self.renderer, &lib.SDL_Rect{ .x = 1, .y = 1, .w = 256, .h = 128 });
+    try self.setColor(Color.pico8[8]);
+    _ = lib.SDL_RenderDrawRect(self.renderer, &lib.SDL_Rect{ .x = 0, .y = 0, .w = 512, .h = 256 });
+
+    for (0..16) |i| {
+        try self.setColor(Color.pico8[i]);
+        _ = lib.SDL_RenderFillRect(self.renderer, &lib.SDL_Rect{
+            .x = @intCast((i % 4) * 32 + 260),
+            .y = @intCast((i / 4) * 32 + 4),
+            .w = 32,
+            .h = 32,
+        });
+    }
 }
 
 pub fn toFramebuffer(self: Self) !void {
-    if (sdl.SDL_SetRenderTarget(self.renderer, self.framebuffer) != 0) {
-        sdl.SDL_Log("Unable to set render target to framebuffer: %s", sdl.SDL_GetError());
+    if (lib.SDL_SetRenderTarget(self.renderer, self.framebuffer) != 0) {
+        lib.SDL_Log("Unable to set render target to framebuffer: %s", lib.SDL_GetError());
         return error.SDLError;
     }
 }
 
 pub fn toScreen(self: Self) !void {
-    if (sdl.SDL_SetRenderTarget(self.renderer, null) != 0) {
-        sdl.SDL_Log("Unable to set render target to window: %s", sdl.SDL_GetError());
+    if (lib.SDL_SetRenderTarget(self.renderer, null) != 0) {
+        lib.SDL_Log("Unable to set render target to window: %s", lib.SDL_GetError());
         return error.SDLError;
     }
 }
 
 pub fn toggleFullscreen(self: *Self) !void {
     self.fullscreen = !self.fullscreen;
-    if (sdl.SDL_SetWindowFullscreen(
+    if (lib.SDL_SetWindowFullscreen(
         self.window,
-        if (self.fullscreen) sdl.SDL_WINDOW_FULLSCREEN_DESKTOP else 0,
+        if (self.fullscreen) lib.SDL_WINDOW_FULLSCREEN_DESKTOP else 0,
     ) != 0) {
-        sdl.SDL_Log("Unable to toggle fullscreen: %s", sdl.SDL_GetError());
+        lib.SDL_Log("Unable to toggle fullscreen: %s", lib.SDL_GetError());
         return error.SDLError;
     }
 }
