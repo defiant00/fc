@@ -15,11 +15,17 @@ pub fn build(b: *std.Build) void {
     exe.addIncludePath(.{ .path = sdl_path ++ "include" });
     exe.addLibraryPath(.{ .path = sdl_path ++ "lib/x64" });
 
-    exe.linkSystemLibrary("sdl2");
+    const sdl_image_path = "lib/SDL2_image-2.6.3/";
+    exe.addIncludePath(.{ .path = sdl_image_path ++ "include" });
+    exe.addLibraryPath(.{ .path = sdl_image_path ++ "lib/x64" });
+
+    exe.linkSystemLibrary("SDL2");
+    exe.linkSystemLibrary("SDL2_image");
     exe.linkLibC();
 
     b.installArtifact(exe);
     b.installBinFile(sdl_path ++ "lib/x64/SDL2.dll", "SDL2.dll");
+    b.installBinFile(sdl_image_path ++ "lib/x64/SDL2_image.dll", "SDL2_image.dll");
 
     const run_cmd = b.addRunArtifact(exe);
 

@@ -2,9 +2,12 @@ const std = @import("std");
 const Color = @import("Color.zig");
 pub const lib = @cImport({
     @cInclude("SDL.h");
+    @cInclude("SDL_image.h");
 });
 
 const Self = @This();
+
+const graphics = @embedFile("res/graphics.png");
 
 const RENDER_WIDTH = 512;
 const RENDER_HEIGHT = 256;
@@ -13,14 +16,19 @@ const RENDER_FPS = 60;
 const FRAMEBUFFER_WIDTH = 512;
 const FRAMEBUFFER_HEIGHT = 1024;
 
+const VRAM_WIDTH = 2048;
+const VRAM_HEIGHT = 4096;
+
 window: ?*lib.SDL_Window,
 renderer: ?*lib.SDL_Renderer,
 framebuffer: ?*lib.SDL_Texture,
+vram: ?*lib.SDL_Texture,
 frame: u64,
 fullscreen: bool,
 screen_rect: lib.SDL_Rect,
 
 pub fn init() !Self {
+    // SDL
     if (lib.SDL_Init(lib.SDL_INIT_VIDEO) != 0) {
         lib.SDL_Log("Unable to init SDL: %s", lib.SDL_GetError());
         return error.SDLInitializationFailed;
@@ -54,10 +62,63 @@ pub fn init() !Self {
         return error.SDLInitializationFailed;
     };
 
+    const vram = lib.SDL_CreateTexture(
+        renderer,
+        lib.SDL_PIXELFORMAT_ARGB8888,
+        lib.SDL_TEXTUREACCESS_TARGET,
+        VRAM_WIDTH,
+        VRAM_HEIGHT,
+    ) orelse {
+        lib.SDL_Log("Unable to create texture: %s", lib.SDL_GetError());
+        return error.SDLInitializationFailed;
+    };
+
+    // SDL Image
+    if (lib.IMG_Init(lib.IMG_INIT_PNG) & lib.IMG_INIT_PNG == 0) {
+        lib.SDL_Log("Unable to init SDL image: %s", lib.IMG_GetError());
+        return error.SDLInitializationFailed;
+    }
+
+    const rw = lib.SDL_RWFromConstMem(graphics, graphics.len) orelse {
+        lib.SDL_Log("Unable to read graphics: %s", lib.SDL_GetError());
+        return error.SDLInitializationFailed;
+    };
+
+    const gr_tex = lib.IMG_LoadTexture_RW(renderer, rw, 1) orelse {
+        lib.SDL_Log("Unable to load graphics texture: %s", lib.IMG_GetError());
+        return error.SDLInitializationFailed;
+    };
+
+    // copy graphics to vram
+    if (lib.SDL_SetRenderTarget(renderer, vram) != 0) {
+        lib.SDL_Log("Unable to set render target to vram: %s", lib.SDL_GetError());
+        return error.SDLError;
+    }
+    if (lib.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0) != 0) {
+        lib.SDL_Log("Unable to set color: %s", lib.SDL_GetError());
+        return error.SDLError;
+    }
+    if (lib.SDL_RenderClear(renderer) != 0) {
+        lib.SDL_Log("Unable to clear render: %s", lib.SDL_GetError());
+        return error.SDLError;
+    }
+    if (lib.SDL_RenderCopy(
+        renderer,
+        gr_tex,
+        null,
+        &lib.SDL_Rect{ .x = 0, .y = VRAM_HEIGHT / 2, .w = VRAM_WIDTH, .h = VRAM_HEIGHT / 2 },
+    ) != 0) {
+        lib.SDL_Log("Unable to copy to vram: %s", lib.SDL_GetError());
+        return error.SDLError;
+    }
+
+    lib.SDL_DestroyTexture(gr_tex);
+
     return .{
         .window = window,
         .renderer = renderer,
         .framebuffer = framebuffer,
+        .vram = vram,
         .frame = getFrame(),
         .fullscreen = false,
         .screen_rect = lib.SDL_Rect{ .x = 0, .y = 0, .w = RENDER_WIDTH, .h = RENDER_HEIGHT },
@@ -65,6 +126,9 @@ pub fn init() !Self {
 }
 
 pub fn deinit(self: Self) void {
+    lib.IMG_Quit();
+
+    if (self.vram) |vram| lib.SDL_DestroyTexture(vram);
     if (self.framebuffer) |framebuffer| lib.SDL_DestroyTexture(framebuffer);
     if (self.renderer) |renderer| lib.SDL_DestroyRenderer(renderer);
     if (self.window) |window| lib.SDL_DestroyWindow(window);
@@ -148,6 +212,16 @@ pub fn testDraw(self: Self) !void {
             .w = 32,
             .h = 32,
         });
+    }
+
+    if (lib.SDL_RenderCopy(
+        self.renderer,
+        self.vram,
+        &lib.SDL_Rect{ .x = 0, .y = 2048, .w = 400, .h = 32 },
+        &lib.SDL_Rect{ .x = 8, .y = 140, .w = 400, .h = 32 },
+    ) != 0) {
+        lib.SDL_Log("Unable to render from vram: %s", lib.SDL_GetError());
+        return error.SDLError;
     }
 }
 
