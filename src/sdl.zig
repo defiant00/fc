@@ -16,8 +16,8 @@ const RENDER_FPS = 60;
 const FRAMEBUFFER_WIDTH = 512;
 const FRAMEBUFFER_HEIGHT = 1024;
 
-const VRAM_WIDTH = 2048;
-const VRAM_HEIGHT = 4096;
+const VRAM_WIDTH = 1024;
+const VRAM_HEIGHT = 1024;
 
 window: ?*lib.SDL_Window,
 renderer: ?*lib.SDL_Renderer,
@@ -62,17 +62,6 @@ pub fn init() !Self {
         return error.SDLInitializationFailed;
     };
 
-    const vram = lib.SDL_CreateTexture(
-        renderer,
-        lib.SDL_PIXELFORMAT_ARGB8888,
-        lib.SDL_TEXTUREACCESS_TARGET,
-        VRAM_WIDTH,
-        VRAM_HEIGHT,
-    ) orelse {
-        lib.SDL_Log("Unable to create texture: %s", lib.SDL_GetError());
-        return error.SDLInitializationFailed;
-    };
-
     // SDL Image
     if (lib.IMG_Init(lib.IMG_INIT_PNG) & lib.IMG_INIT_PNG == 0) {
         lib.SDL_Log("Unable to init SDL image: %s", lib.IMG_GetError());
@@ -84,35 +73,44 @@ pub fn init() !Self {
         return error.SDLInitializationFailed;
     };
 
-    const gr_tex = lib.IMG_LoadTexture_RW(renderer, rw, 1) orelse {
-        lib.SDL_Log("Unable to load graphics texture: %s", lib.IMG_GetError());
+    const gr_surf = lib.IMG_Load_RW(rw, 1) orelse {
+        lib.SDL_Log("Unable to load graphics surface: %s", lib.IMG_GetError());
         return error.SDLInitializationFailed;
     };
 
     // copy graphics to vram
-    if (lib.SDL_SetRenderTarget(renderer, vram) != 0) {
-        lib.SDL_Log("Unable to set render target to vram: %s", lib.SDL_GetError());
-        return error.SDLError;
-    }
-    if (lib.SDL_SetRenderDrawColor(renderer, 0, 0, 0, 0) != 0) {
-        lib.SDL_Log("Unable to set color: %s", lib.SDL_GetError());
-        return error.SDLError;
-    }
-    if (lib.SDL_RenderClear(renderer) != 0) {
-        lib.SDL_Log("Unable to clear render: %s", lib.SDL_GetError());
-        return error.SDLError;
-    }
-    if (lib.SDL_RenderCopy(
-        renderer,
-        gr_tex,
+    const vram_surf = lib.SDL_CreateRGBSurface(
+        0,
+        VRAM_WIDTH,
+        VRAM_HEIGHT * 2,
+        gr_surf.*.format.*.BitsPerPixel,
+        gr_surf.*.format.*.Rmask,
+        gr_surf.*.format.*.Gmask,
+        gr_surf.*.format.*.Bmask,
+        gr_surf.*.format.*.Amask,
+    ) orelse {
+        lib.SDL_Log("Unable to create surface: %s", lib.SDL_GetError());
+        return error.SDLInitializationFailed;
+    };
+
+    var dest_rect = lib.SDL_Rect{ .x = 0, .y = VRAM_HEIGHT, .w = VRAM_WIDTH, .h = VRAM_HEIGHT };
+    if (lib.SDL_BlitSurface(
+        gr_surf,
         null,
-        &lib.SDL_Rect{ .x = 0, .y = VRAM_HEIGHT / 2, .w = VRAM_WIDTH, .h = VRAM_HEIGHT / 2 },
+        vram_surf,
+        &dest_rect,
     ) != 0) {
-        lib.SDL_Log("Unable to copy to vram: %s", lib.SDL_GetError());
-        return error.SDLError;
+        lib.SDL_Log("Unable to blit graphics: %s", lib.SDL_GetError());
+        return error.SDLInitializationFailed;
     }
 
-    lib.SDL_DestroyTexture(gr_tex);
+    const vram = lib.SDL_CreateTextureFromSurface(renderer, vram_surf) orelse {
+        lib.SDL_Log("Unable to create vram: %s", lib.SDL_GetError());
+        return error.SDLInitializationFailed;
+    };
+
+    lib.SDL_FreeSurface(vram_surf);
+    lib.SDL_FreeSurface(gr_surf);
 
     return .{
         .window = window,
@@ -217,7 +215,7 @@ pub fn testDraw(self: Self) !void {
     if (lib.SDL_RenderCopy(
         self.renderer,
         self.vram,
-        &lib.SDL_Rect{ .x = 0, .y = 2048, .w = 400, .h = 32 },
+        &lib.SDL_Rect{ .x = 0, .y = VRAM_HEIGHT, .w = 400, .h = 32 },
         &lib.SDL_Rect{ .x = 8, .y = 140, .w = 400, .h = 32 },
     ) != 0) {
         lib.SDL_Log("Unable to render from vram: %s", lib.SDL_GetError());
