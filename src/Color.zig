@@ -12,6 +12,7 @@ a: u8,
 // 132 140 148 156 165 173 181 189 198 206 214 222 231 239 247 255
 
 pub const black = from555(0, 0, 0);
+pub const white = from555(31, 31, 31);
 
 pub const pico8 = [_]Self{
     from555(0, 0, 1), // black

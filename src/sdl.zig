@@ -221,6 +221,8 @@ pub fn step(self: *Self) bool {
 }
 
 pub fn testDraw(self: Self) !void {
+    try self.tint(Color.white);
+
     try self.setColor(Color.from555(7, 7, 7));
     try self.clear();
 
@@ -250,6 +252,15 @@ pub fn testDraw(self: Self) !void {
     }
 
     try self.print(100, 180, "0123,456,789\n/3 >");
+    try self.tint(Color.pico8[9]);
+    try self.print(100, 220, "99.9%");
+}
+
+pub fn tint(self: Self, c: Color) !void {
+    if (lib.SDL_SetTextureColorMod(self.vram, c.r, c.g, c.b) != 0) {
+        lib.SDL_Log("Unable to set tint color: %s", lib.SDL_GetError());
+        return error.SDLError;
+    }
 }
 
 pub fn toFramebuffer(self: Self) !void {
