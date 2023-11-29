@@ -148,6 +148,33 @@ pub fn present(self: Self) void {
     lib.SDL_RenderPresent(self.renderer);
 }
 
+pub fn print(self: Self, x: u16, y: u16, text: []const u8) !void {
+    // todo - background?
+
+    var src = lib.SDL_Rect{ .x = 0, .y = VRAM_HEIGHT, .w = 8, .h = 16 };
+    var dest = lib.SDL_Rect{ .x = x, .y = y, .w = 8, .h = 16 };
+    for (text) |c| {
+        if (c == '\n') {
+            dest.x = x;
+            dest.y += 16;
+        } else if (c == '\t') {
+            dest.x += 16;
+        } else {
+            src.x = (c - 32) * 8;
+            if (lib.SDL_RenderCopy(
+                self.renderer,
+                self.vram,
+                &src,
+                &dest,
+            ) != 0) {
+                lib.SDL_Log("Unable to render text: %s", lib.SDL_GetError());
+                return error.SDLError;
+            }
+            dest.x += 8;
+        }
+    }
+}
+
 pub fn renderFramebuffer(self: Self) !void {
     if (lib.SDL_RenderCopy(
         self.renderer,
@@ -221,6 +248,8 @@ pub fn testDraw(self: Self) !void {
         lib.SDL_Log("Unable to render from vram: %s", lib.SDL_GetError());
         return error.SDLError;
     }
+
+    try self.print(100, 180, "0123,456,789\n/3 >");
 }
 
 pub fn toFramebuffer(self: Self) !void {
