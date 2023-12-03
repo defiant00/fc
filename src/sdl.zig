@@ -25,7 +25,9 @@ framebuffer: ?*lib.SDL_Texture,
 vram: ?*lib.SDL_Texture,
 frame: u64,
 fullscreen: bool,
+pixel_perfect: bool,
 screen_rect: lib.SDL_Rect,
+screen_scale: f32,
 
 pub fn init() !Self {
     // SDL
@@ -119,7 +121,14 @@ pub fn init() !Self {
         .vram = vram,
         .frame = getFrame(),
         .fullscreen = false,
-        .screen_rect = lib.SDL_Rect{ .x = 0, .y = 0, .w = RENDER_WIDTH, .h = RENDER_HEIGHT },
+        .pixel_perfect = false,
+        .screen_rect = lib.SDL_Rect{
+            .x = 0,
+            .y = 0,
+            .w = RENDER_WIDTH,
+            .h = RENDER_HEIGHT,
+        },
+        .screen_scale = 1,
     };
 }
 
@@ -150,27 +159,33 @@ pub fn present(self: Self) void {
 
 pub fn print(self: Self, x: u16, y: u16, text: []const u8) !void {
     // todo - background?
+    // todo - measure string
 
     var src = lib.SDL_Rect{ .x = 0, .y = VRAM_HEIGHT, .w = 8, .h = 16 };
     var dest = lib.SDL_Rect{ .x = x, .y = y, .w = 8, .h = 16 };
     for (text) |c| {
-        if (c == '\n') {
-            dest.x = x;
-            dest.y += 16;
-        } else if (c == '\t') {
-            dest.x += 16;
-        } else {
-            src.x = (c - 32) * 8;
-            if (lib.SDL_RenderCopy(
-                self.renderer,
-                self.vram,
-                &src,
-                &dest,
-            ) != 0) {
-                lib.SDL_Log("Unable to render text: %s", lib.SDL_GetError());
-                return error.SDLError;
-            }
-            dest.x += 8;
+        switch (c) {
+            ' ' => dest.x += 8,
+            '\t' => dest.x += 16,
+            '\r' => dest.x = x,
+            '\n' => {
+                dest.x = x;
+                dest.y += 16;
+            },
+            else => {
+                src.x = if (c > ' ' and c <= 137) (@as(c_int, c) - ' ') * 8 else 0;
+
+                if (lib.SDL_RenderCopy(
+                    self.renderer,
+                    self.vram,
+                    &src,
+                    &dest,
+                ) != 0) {
+                    lib.SDL_Log("Unable to render text: %s", lib.SDL_GetError());
+                    return error.SDLError;
+                }
+                dest.x += 8;
+            },
         }
     }
 }
@@ -188,15 +203,18 @@ pub fn renderFramebuffer(self: Self) !void {
 }
 
 pub fn resize(self: *Self, x: i32, y: i32) void {
-    const fx: f64 = @floatFromInt(x);
-    const fy: f64 = @floatFromInt(y);
-    const scale = @min(fx / RENDER_WIDTH, fy / RENDER_HEIGHT);
+    const fx: f32 = @floatFromInt(x);
+    const fy: f32 = @floatFromInt(y);
+    self.screen_scale = @min(fx / RENDER_WIDTH, fy / RENDER_HEIGHT);
+    if (self.pixel_perfect and self.screen_scale > 1) {
+        self.screen_scale = @floor(self.screen_scale);
+    }
 
-    self.screen_rect.x = @intFromFloat((fx - (scale * RENDER_WIDTH)) / 2);
-    self.screen_rect.y = @intFromFloat((fy - (scale * RENDER_HEIGHT)) / 2);
+    self.screen_rect.x = @intFromFloat((fx - (self.screen_scale * RENDER_WIDTH)) / 2);
+    self.screen_rect.y = @intFromFloat((fy - (self.screen_scale * RENDER_HEIGHT)) / 2);
 
-    self.screen_rect.w = @intFromFloat(scale * RENDER_WIDTH);
-    self.screen_rect.h = @intFromFloat(scale * RENDER_HEIGHT);
+    self.screen_rect.w = @intFromFloat(self.screen_scale * RENDER_WIDTH);
+    self.screen_rect.h = @intFromFloat(self.screen_scale * RENDER_HEIGHT);
 }
 
 pub fn setColor(self: Self, c: Color) !void {
@@ -251,9 +269,13 @@ pub fn testDraw(self: Self) !void {
         return error.SDLError;
     }
 
-    try self.print(100, 180, "0123,456,789\n/3 >");
+    try self.print(10, 180, "Hello, world!\nsome TEXT~ don't know...");
     try self.tint(Color.pico8[9]);
-    try self.print(100, 220, "99.9%");
+    try self.print(10, 220, "99.9% something?");
+    try self.tint(Color.pico8[12]);
+    try self.print(250, 180, "\x7f\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a");
+    try self.tint(Color.pico8[14]);
+    try self.print(250, 196, "\x7f\x7f\x80\x80\x81\x82\x87\x88\x85\x83\x84\x86\x89");
 }
 
 pub fn tint(self: Self, c: Color) !void {
@@ -286,4 +308,13 @@ pub fn toggleFullscreen(self: *Self) !void {
         lib.SDL_Log("Unable to toggle fullscreen: %s", lib.SDL_GetError());
         return error.SDLError;
     }
+}
+
+pub fn togglePixelPerfect(self: *Self) void {
+    self.pixel_perfect = !self.pixel_perfect;
+
+    var x: c_int = 0;
+    var y: c_int = 0;
+    lib.SDL_GetWindowSize(self.window, &x, &y);
+    self.resize(x, y);
 }
