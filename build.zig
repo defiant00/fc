@@ -4,48 +4,62 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
-    const exe = b.addExecutable(.{
+    const fc_exe = b.addExecutable(.{
         .name = "fc",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = .{ .path = "src/fc/main.zig" },
         .target = target,
         .optimize = optimize,
     });
 
+    const gc_exe = b.addExecutable(.{
+        .name = "gc",
+        .root_source_file = .{ .path = "src/gc/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const shared = b.addModule("shared", .{
+        .source_file = .{ .path = "src/shared/shared.zig" },
+    });
+
+    fc_exe.addModule("shared", shared);
+    gc_exe.addModule("shared", shared);
+
     const sdl_path = "lib/SDL2-2.28.5/";
-    exe.addIncludePath(.{ .path = sdl_path ++ "include" });
-    exe.addLibraryPath(.{ .path = sdl_path ++ "lib/x64" });
+    fc_exe.addIncludePath(.{ .path = sdl_path ++ "include" });
+    fc_exe.addLibraryPath(.{ .path = sdl_path ++ "lib/x64" });
+    gc_exe.addIncludePath(.{ .path = sdl_path ++ "include" });
+    gc_exe.addLibraryPath(.{ .path = sdl_path ++ "lib/x64" });
 
     const sdl_image_path = "lib/SDL2_image-2.6.3/";
-    exe.addIncludePath(.{ .path = sdl_image_path ++ "include" });
-    exe.addLibraryPath(.{ .path = sdl_image_path ++ "lib/x64" });
+    fc_exe.addIncludePath(.{ .path = sdl_image_path ++ "include" });
+    fc_exe.addLibraryPath(.{ .path = sdl_image_path ++ "lib/x64" });
 
-    exe.linkSystemLibrary("SDL2");
-    exe.linkSystemLibrary("SDL2_image");
-    exe.linkLibC();
+    fc_exe.linkSystemLibrary("SDL2");
+    fc_exe.linkSystemLibrary("SDL2_image");
+    fc_exe.linkLibC();
 
-    b.installArtifact(exe);
+    gc_exe.linkSystemLibrary("SDL2");
+    gc_exe.linkLibC();
+
+    b.installArtifact(fc_exe);
+    b.installArtifact(gc_exe);
     b.installBinFile(sdl_path ++ "lib/x64/SDL2.dll", "SDL2.dll");
     b.installBinFile(sdl_image_path ++ "lib/x64/SDL2_image.dll", "SDL2_image.dll");
 
-    const run_cmd = b.addRunArtifact(exe);
+    const fc_run_cmd = b.addRunArtifact(fc_exe);
+    const gc_run_cmd = b.addRunArtifact(gc_exe);
 
-    run_cmd.step.dependOn(b.getInstallStep());
+    fc_run_cmd.step.dependOn(b.getInstallStep());
+    gc_run_cmd.step.dependOn(b.getInstallStep());
 
     if (b.args) |args| {
-        run_cmd.addArgs(args);
+        fc_run_cmd.addArgs(args);
+        gc_run_cmd.addArgs(args);
     }
 
-    const run_step = b.step("run", "Run the app");
-    run_step.dependOn(&run_cmd.step);
-
-    const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-
-    const run_unit_tests = b.addRunArtifact(unit_tests);
-
-    const test_step = b.step("test", "Run unit tests");
-    test_step.dependOn(&run_unit_tests.step);
+    const fc_run_step = b.step("run-fc", "Run fantasy console (fc)");
+    const gc_run_step = b.step("run-gc", "Run graphics compiler (gc)");
+    fc_run_step.dependOn(&fc_run_cmd.step);
+    gc_run_step.dependOn(&gc_run_cmd.step);
 }

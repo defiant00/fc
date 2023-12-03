@@ -37,8 +37,12 @@ fn toByte(val: u5) u8 {
     return (@as(u8, val) << 3) | (val >> 2);
 }
 
-fn toColor(r: u5, g: u5, b: u5, a: u1) u16 {
-    return r | (@as(u16, g) << 5) | (@as(u16, b) << 10) | (@as(u16, a) << 15);
+pub fn from16(c: u16) Self {
+    const r: u5 = @intCast(c & 0x1f);
+    const g: u5 = @intCast((c >> 5) & 0x1f);
+    const b: u5 = @intCast((c >> 10) & 0x1f);
+    const a: u1 = @intCast(c >> 15);
+    return from5551(r, g, b, a);
 }
 
 pub fn from555(r: u5, g: u5, b: u5) Self {
@@ -52,4 +56,12 @@ pub fn from5551(r: u5, g: u5, b: u5, a: u1) Self {
         .b = toByte(b),
         .a = if (a > 0) 0xff else 0,
     };
+}
+
+pub fn to5551(r: u8, g: u8, b: u8, a: u8) u16 {
+    const r16: u16 = r >> 3;
+    const g16: u16 = g >> 3;
+    const b16: u16 = b >> 3;
+    const a16: u16 = a >> 7;
+    return r16 | (g16 << 5) | (b16 << 10) | (a16 << 15);
 }

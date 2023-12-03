@@ -1,13 +1,13 @@
 const std = @import("std");
-const Color = @import("Color.zig");
+const shared = @import("shared");
+const Color = shared.Color;
+
 pub const lib = @cImport({
     @cInclude("SDL.h");
     @cInclude("SDL_image.h");
 });
 
 const Self = @This();
-
-const graphics = @embedFile("res/graphics.png");
 
 const RENDER_WIDTH = 512;
 const RENDER_HEIGHT = 256;
@@ -70,7 +70,7 @@ pub fn init() !Self {
         return error.SDLInitializationFailed;
     }
 
-    const rw = lib.SDL_RWFromConstMem(graphics, graphics.len) orelse {
+    const rw = lib.SDL_RWFromConstMem(shared.graphics, shared.graphics.len) orelse {
         lib.SDL_Log("Unable to read graphics: %s", lib.SDL_GetError());
         return error.SDLInitializationFailed;
     };
@@ -85,11 +85,11 @@ pub fn init() !Self {
         0,
         VRAM_WIDTH,
         VRAM_HEIGHT * 2,
-        gr_surf.*.format.*.BitsPerPixel,
-        gr_surf.*.format.*.Rmask,
-        gr_surf.*.format.*.Gmask,
-        gr_surf.*.format.*.Bmask,
-        gr_surf.*.format.*.Amask,
+        32,
+        0xff,
+        0xff00,
+        0xff0000,
+        0xff000000,
     ) orelse {
         lib.SDL_Log("Unable to create surface: %s", lib.SDL_GetError());
         return error.SDLInitializationFailed;

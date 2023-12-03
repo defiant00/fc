@@ -1,5 +1,5 @@
 const std = @import("std");
-const Color = @import("Color.zig");
+const Color = @import("shared").Color;
 const sdl = @import("sdl.zig");
 
 pub fn main() !void {
