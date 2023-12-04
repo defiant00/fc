@@ -38,11 +38,12 @@ fn toByte(val: u5) u8 {
 }
 
 pub fn from16(c: u16) Self {
-    const r: u5 = @intCast(c & 0x1f);
-    const g: u5 = @intCast((c >> 5) & 0x1f);
-    const b: u5 = @intCast((c >> 10) & 0x1f);
-    const a: u1 = @intCast(c >> 15);
-    return from5551(r, g, b, a);
+    return .{
+        .r = toByte(@intCast(c & 0x1f)),
+        .g = toByte(@intCast((c >> 5) & 0x1f)),
+        .b = toByte(@intCast((c >> 10) & 0x1f)),
+        .a = if ((c >> 15) > 0) 0xff else 0,
+    };
 }
 
 pub fn from555(r: u5, g: u5, b: u5) Self {

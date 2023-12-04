@@ -7,13 +7,14 @@ pub const lib = @cImport({
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    var alloc = gpa.allocator();
+    const alloc = gpa.allocator();
 
     const args = try std.process.argsAlloc(alloc);
     defer std.process.argsFree(alloc, args);
 
     if (args.len == 2) {
-        std.debug.print("Converting {s}...\n", .{args[1]});
+        std.debug.print("Converting {s}\n", .{args[1]});
+
         const img = lib.SDL_LoadBMP(args[1]) orelse {
             lib.SDL_Log("Unable to load image: %s", lib.SDL_GetError());
             return error.SDLError;
@@ -37,7 +38,6 @@ pub fn main() !void {
         }
 
         var writer = comp.writer();
-        try writer.writeAll("whee!");
         try writer.writeInt(u16, @intCast(img.*.w), .little);
         try writer.writeInt(u16, @intCast(img.*.h), .little);
 
@@ -55,25 +55,15 @@ pub fn main() !void {
         for (0..count) |i| {
             lib.SDL_GetRGBA(pixels[i], img.*.format, &r, &g, &b, &a);
             const uc = Color.to5551(r, g, b, a);
-            const co = Color.from16(uc);
-            std.debug.print("{d}: {d},{d},{d},{d} - {d} ({d},{d},{d},{d})\n", .{
-                i,
-                r,
-                g,
-                b,
-                a,
-                uc,
-                co.r,
-                co.g,
-                co.b,
-                co.a,
-            });
+            try writer.writeInt(u16, uc, .little);
         }
 
         try comp.close();
 
         lib.SDL_UnlockSurface(img);
         lib.SDL_FreeSurface(img);
+
+        std.debug.print("  Done\n", .{});
     }
 
     // decode
