@@ -31,12 +31,7 @@ pub fn build(b: *std.Build) void {
     gc_exe.addIncludePath(.{ .path = sdl_path ++ "include" });
     gc_exe.addLibraryPath(.{ .path = sdl_path ++ "lib/x64" });
 
-    const sdl_image_path = "lib/SDL2_image-2.6.3/";
-    fc_exe.addIncludePath(.{ .path = sdl_image_path ++ "include" });
-    fc_exe.addLibraryPath(.{ .path = sdl_image_path ++ "lib/x64" });
-
     fc_exe.linkSystemLibrary("SDL2");
-    fc_exe.linkSystemLibrary("SDL2_image");
     fc_exe.linkLibC();
 
     gc_exe.linkSystemLibrary("SDL2");
@@ -45,7 +40,6 @@ pub fn build(b: *std.Build) void {
     b.installArtifact(fc_exe);
     b.installArtifact(gc_exe);
     b.installBinFile(sdl_path ++ "lib/x64/SDL2.dll", "SDL2.dll");
-    b.installBinFile(sdl_image_path ++ "lib/x64/SDL2_image.dll", "SDL2_image.dll");
 
     const fc_run_cmd = b.addRunArtifact(fc_exe);
     const gc_run_cmd = b.addRunArtifact(gc_exe);

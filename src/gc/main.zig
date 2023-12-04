@@ -65,19 +65,4 @@ pub fn main() !void {
 
         std.debug.print("  Done\n", .{});
     }
-
-    // decode
-    // file = try std.fs.cwd().openFile("compressed_test.bin", .{});
-    // var dec = try std.compress.deflate.decompressor(alloc, file.reader(), null);
-    // var re = dec.reader();
-    // var dec_val = try re.readAllAlloc(alloc, std.math.maxInt(usize));
-
-    // std.debug.print("value: '{s}'\n", .{dec_val});
-
-    // cleanup
-    // alloc.free(dec_val);
-    // if (dec.close()) |e| return e;
-    // dec.deinit();
-    // file.close();
-
 }

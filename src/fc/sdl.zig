@@ -4,7 +4,6 @@ const Color = shared.Color;
 
 pub const lib = @cImport({
     @cInclude("SDL.h");
-    @cInclude("SDL_image.h");
 });
 
 const Self = @This();
@@ -29,7 +28,51 @@ pixel_perfect: bool,
 screen_rect: lib.SDL_Rect,
 screen_scale: f32,
 
-pub fn init() !Self {
+pub fn init(alloc: std.mem.Allocator) !Self {
+    // VRAM
+    var gr_buffer = std.io.fixedBufferStream(shared.graphics);
+    var dec = try std.compress.deflate.decompressor(alloc, gr_buffer.reader(), null);
+    var dec_r = dec.reader();
+    const w: usize = try dec_r.readInt(u16, .little);
+    const h: usize = try dec_r.readInt(u16, .little);
+
+    const vram_surf = lib.SDL_CreateRGBSurface(
+        0,
+        VRAM_WIDTH,
+        VRAM_HEIGHT * 2,
+        32,
+        0xff,
+        0xff00,
+        0xff0000,
+        0xff000000,
+    ) orelse {
+        lib.SDL_Log("Unable to create surface: %s", lib.SDL_GetError());
+        return error.SDLInitializationFailed;
+    };
+
+    if (lib.SDL_LockSurface(vram_surf) != 0) {
+        lib.SDL_Log("Unable to lock surface: %s", lib.SDL_GetError());
+        return error.SDLError;
+    }
+    const pixels: [*]u32 = @ptrCast(@alignCast(vram_surf.*.pixels));
+    for (0..h) |hi| {
+        for (0..w) |wi| {
+            const uc = try dec_r.readInt(u16, .little);
+            const color = Color.from16(uc);
+            pixels[VRAM_WIDTH * VRAM_HEIGHT + hi * VRAM_WIDTH + wi] = lib.SDL_MapRGBA(
+                vram_surf.*.format,
+                color.r,
+                color.g,
+                color.b,
+                color.a,
+            );
+        }
+    }
+    lib.SDL_UnlockSurface(vram_surf);
+
+    if (dec.close()) |e| return e;
+    dec.deinit();
+
     // SDL
     if (lib.SDL_Init(lib.SDL_INIT_VIDEO) != 0) {
         lib.SDL_Log("Unable to init SDL: %s", lib.SDL_GetError());
@@ -64,55 +107,12 @@ pub fn init() !Self {
         return error.SDLInitializationFailed;
     };
 
-    // SDL Image
-    if (lib.IMG_Init(lib.IMG_INIT_PNG) & lib.IMG_INIT_PNG == 0) {
-        lib.SDL_Log("Unable to init SDL image: %s", lib.IMG_GetError());
-        return error.SDLInitializationFailed;
-    }
-
-    const rw = lib.SDL_RWFromConstMem(shared.graphics, shared.graphics.len) orelse {
-        lib.SDL_Log("Unable to read graphics: %s", lib.SDL_GetError());
-        return error.SDLInitializationFailed;
-    };
-
-    const gr_surf = lib.IMG_Load_RW(rw, 1) orelse {
-        lib.SDL_Log("Unable to load graphics surface: %s", lib.IMG_GetError());
-        return error.SDLInitializationFailed;
-    };
-
-    // copy graphics to vram
-    const vram_surf = lib.SDL_CreateRGBSurface(
-        0,
-        VRAM_WIDTH,
-        VRAM_HEIGHT * 2,
-        32,
-        0xff,
-        0xff00,
-        0xff0000,
-        0xff000000,
-    ) orelse {
-        lib.SDL_Log("Unable to create surface: %s", lib.SDL_GetError());
-        return error.SDLInitializationFailed;
-    };
-
-    var dest_rect = lib.SDL_Rect{ .x = 0, .y = VRAM_HEIGHT, .w = VRAM_WIDTH, .h = VRAM_HEIGHT };
-    if (lib.SDL_BlitSurface(
-        gr_surf,
-        null,
-        vram_surf,
-        &dest_rect,
-    ) != 0) {
-        lib.SDL_Log("Unable to blit graphics: %s", lib.SDL_GetError());
-        return error.SDLInitializationFailed;
-    }
-
     const vram = lib.SDL_CreateTextureFromSurface(renderer, vram_surf) orelse {
         lib.SDL_Log("Unable to create vram: %s", lib.SDL_GetError());
         return error.SDLInitializationFailed;
     };
 
     lib.SDL_FreeSurface(vram_surf);
-    lib.SDL_FreeSurface(gr_surf);
 
     return .{
         .window = window,
@@ -133,8 +133,6 @@ pub fn init() !Self {
 }
 
 pub fn deinit(self: Self) void {
-    lib.IMG_Quit();
-
     if (self.vram) |vram| lib.SDL_DestroyTexture(vram);
     if (self.framebuffer) |framebuffer| lib.SDL_DestroyTexture(framebuffer);
     if (self.renderer) |renderer| lib.SDL_DestroyRenderer(renderer);

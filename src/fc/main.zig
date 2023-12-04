@@ -3,39 +3,10 @@ const Color = @import("shared").Color;
 const sdl = @import("sdl.zig");
 
 pub fn main() !void {
-    // var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-    // var alloc = gpa.allocator();
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const alloc = gpa.allocator();
 
-    // encode/decode test
-    // var file = try std.fs.cwd().createFile("compressed_test.bin", .{});
-    // var comp = try std.compress.deflate.compressor(
-    //     alloc,
-    //     file.writer(),
-    //     .{ .level = .best_compression },
-    // );
-    // var wr = comp.writer();
-    // try wr.writeAll("Hello, world!");
-
-    // cleanup
-    // try comp.close();
-    // comp.deinit();
-    // file.close();
-
-    // decode
-    // file = try std.fs.cwd().openFile("compressed_test.bin", .{});
-    // var dec = try std.compress.deflate.decompressor(alloc, file.reader(), null);
-    // var re = dec.reader();
-    // var dec_val = try re.readAllAlloc(alloc, std.math.maxInt(usize));
-
-    // std.debug.print("value: '{s}'\n", .{dec_val});
-
-    // cleanup
-    // alloc.free(dec_val);
-    // if (dec.close()) |e| return e;
-    // dec.deinit();
-    // file.close();
-
-    var sdl_inst = try sdl.init();
+    var sdl_inst = try sdl.init(alloc);
     defer sdl_inst.deinit();
 
     var running = true;
