@@ -6,6 +6,14 @@ pub const lib = @cImport({
     @cInclude("SDL.h");
 });
 
+pub const BlendMode = enum {
+    add,
+    alpha,
+    average,
+    multiply,
+    none,
+};
+
 const Self = @This();
 
 const RENDER_WIDTH = 512;
@@ -27,6 +35,7 @@ fullscreen: bool,
 pixel_perfect: bool,
 screen_rect: lib.SDL_Rect,
 screen_scale: f32,
+blend_modes: [3]BlendMode,
 
 pub fn init(alloc: std.mem.Allocator) !Self {
     // VRAM
@@ -129,6 +138,7 @@ pub fn init(alloc: std.mem.Allocator) !Self {
             .h = RENDER_HEIGHT,
         },
         .screen_scale = 1,
+        .blend_modes = [_]BlendMode{ .none, .none, .none },
     };
 }
 
@@ -156,9 +166,6 @@ pub fn present(self: Self) void {
 }
 
 pub fn print(self: Self, x: u16, y: u16, text: []const u8) !void {
-    // todo - background?
-    // todo - measure string
-
     var src = lib.SDL_Rect{ .x = 0, .y = VRAM_HEIGHT, .w = 8, .h = 16 };
     var dest = lib.SDL_Rect{ .x = x, .y = y, .w = 8, .h = 16 };
     for (text) |c| {
@@ -189,14 +196,25 @@ pub fn print(self: Self, x: u16, y: u16, text: []const u8) !void {
 }
 
 pub fn renderFramebuffer(self: Self) !void {
-    if (lib.SDL_RenderCopy(
-        self.renderer,
-        self.framebuffer,
-        &lib.SDL_Rect{ .x = 0, .y = 0, .w = RENDER_WIDTH, .h = RENDER_HEIGHT },
-        &self.screen_rect,
-    ) != 0) {
+    var rect = lib.SDL_Rect{ .x = 0, .y = 0, .w = RENDER_WIDTH, .h = RENDER_HEIGHT };
+
+    // draw layer 0
+    try self.setBlendMode(.none);
+    if (lib.SDL_RenderCopy(self.renderer, self.framebuffer, &rect, &self.screen_rect) != 0) {
         lib.SDL_Log("Unable to render framebuffer: %s", lib.SDL_GetError());
         return error.SDLError;
+    }
+
+    // draw layers 1-3
+    for (0..3) |i| {
+        rect.y += RENDER_HEIGHT;
+        if (self.blend_modes[i] != .none) {
+            try self.setBlendMode(self.blend_modes[i]);
+            if (lib.SDL_RenderCopy(self.renderer, self.framebuffer, &rect, &self.screen_rect) != 0) {
+                lib.SDL_Log("Unable to render framebuffer: %s", lib.SDL_GetError());
+                return error.SDLError;
+            }
+        }
     }
 }
 
@@ -213,6 +231,24 @@ pub fn resize(self: *Self, x: i32, y: i32) void {
 
     self.screen_rect.w = @intFromFloat(self.screen_scale * RENDER_WIDTH);
     self.screen_rect.h = @intFromFloat(self.screen_scale * RENDER_HEIGHT);
+}
+
+fn setBlendMode(self: Self, mode: BlendMode) !void {
+    const alpha: u8 = if (mode == .average) 0x7f else 0xff;
+    const sdl_mode: c_uint = switch (mode) {
+        .add => lib.SDL_BLENDMODE_ADD,
+        .multiply => lib.SDL_BLENDMODE_MUL,
+        .none => lib.SDL_BLENDMODE_NONE,
+        else => lib.SDL_BLENDMODE_BLEND,
+    };
+    if (lib.SDL_SetTextureAlphaMod(self.framebuffer, alpha) != 0) {
+        lib.SDL_Log("Unable to set framebuffer alpha: %s", lib.SDL_GetError());
+        return error.SDLError;
+    }
+    if (lib.SDL_SetTextureBlendMode(self.framebuffer, sdl_mode) != 0) {
+        lib.SDL_Log("Unable to set framebuffer blend mode: %s", lib.SDL_GetError());
+        return error.SDLError;
+    }
 }
 
 pub fn setColor(self: Self, c: Color) !void {
@@ -236,21 +272,19 @@ pub fn step(self: *Self) bool {
     return false;
 }
 
-pub fn testDraw(self: Self) !void {
+pub fn testDraw(self: *Self) !void {
     try self.tint(Color.white);
 
-    try self.setColor(Color.from555(7, 7, 7));
+    try self.setColor(Color.transparent);
     try self.clear();
 
-    try self.setColor(Color.pico8[12]);
-    _ = lib.SDL_RenderDrawRect(self.renderer, &lib.SDL_Rect{ .x = 1, .y = 1, .w = 256, .h = 128 });
     try self.setColor(Color.pico8[8]);
     _ = lib.SDL_RenderDrawRect(self.renderer, &lib.SDL_Rect{ .x = 0, .y = 0, .w = 512, .h = 256 });
 
     for (0..16) |i| {
         try self.setColor(Color.pico8[i]);
         _ = lib.SDL_RenderFillRect(self.renderer, &lib.SDL_Rect{
-            .x = @intCast((i % 4) * 32 + 260),
+            .x = @intCast((i % 4) * 32 + 4),
             .y = @intCast((i / 4) * 32 + 4),
             .w = 32,
             .h = 32,
@@ -274,6 +308,15 @@ pub fn testDraw(self: Self) !void {
     try self.print(250, 180, "\x7f\x80\x81\x82\x83\x84\x85\x86\x87\x88\x89\x8a");
     try self.tint(Color.pico8[14]);
     try self.print(250, 196, "\x7f\x7f\x80\x80\x81\x82\x87\x88\x85\x83\x84\x86\x89");
+
+    self.blend_modes[0] = .multiply;
+    try self.setColor(Color.pico8[8]);
+    _ = lib.SDL_RenderFillRect(self.renderer, &lib.SDL_Rect{
+        .x = 50,
+        .y = 300,
+        .w = 250,
+        .h = 180,
+    });
 }
 
 pub fn tint(self: Self, c: Color) !void {

@@ -1,43 +1,38 @@
-const Self = @This();
+const Color = @This();
 
 r: u8,
 g: u8,
 b: u8,
 a: u8,
 
-//   0   1   2   3   4   5   6   7   8   9  10  11  12  13  14  15
-//   0   8  16  24  33  41  49  57  66  74  82  90  99 107 115 123
+pub const transparent = from8888(0, 0, 0, 0);
+pub const black = from888(0, 0, 0);
+pub const white = from888(0xff, 0xff, 0xff);
 
-//  16  17  18  19  20  21  22  23  24  25  26  27  28  29  30  31
-// 132 140 148 156 165 173 181 189 198 206 214 222 231 239 247 255
-
-pub const black = from555(0, 0, 0);
-pub const white = from555(31, 31, 31);
-
-pub const pico8 = [_]Self{
-    from555(0, 0, 1), // black
-    from555(4, 5, 10), // dark blue
-    from555(15, 4, 10), // dark purple
-    from555(0, 16, 10), // dark green
-    from555(21, 10, 7), // brown
-    from555(12, 11, 10), // dark grey
-    from555(24, 24, 24), // light grey
-    from555(31, 29, 28), // white
-    from555(31, 0, 9), // red
-    from555(31, 20, 0), // orange
-    from555(31, 29, 5), // yellow
-    from555(0, 28, 7), // green
-    from555(5, 21, 31), // blue
-    from555(16, 14, 19), // lavender
-    from555(31, 14, 20), // pink
-    from555(31, 25, 21), // light peach
+pub const pico8 = [_]Color{
+    from888(2, 4, 8), // black
+    from888(29, 43, 83), // dark blue
+    from888(126, 37, 83), // dark purple
+    from888(0, 135, 81), // dark green
+    from888(171, 82, 54), // brown
+    from888(95, 87, 79), // dark grey
+    from888(194, 195, 199), // light grey
+    from888(255, 241, 232), // white
+    from888(255, 0, 77), // red
+    from888(255, 163, 0), // orange
+    from888(255, 236, 39), // yellow
+    from888(0, 228, 54), // green
+    from888(41, 173, 255), // blue
+    from888(131, 118, 156), // lavender
+    from888(255, 119, 168), // pink
+    from888(255, 204, 170), // light peach
 };
 
 fn toByte(val: u5) u8 {
     return (@as(u8, val) << 3) | (val >> 2);
 }
 
-pub fn from16(c: u16) Self {
+pub fn from16(c: u16) Color {
     return .{
         .r = toByte(@intCast(c & 0x1f)),
         .g = toByte(@intCast((c >> 5) & 0x1f)),
@@ -46,16 +41,33 @@ pub fn from16(c: u16) Self {
     };
 }
 
-pub fn from555(r: u5, g: u5, b: u5) Self {
+pub fn from555(r: u5, g: u5, b: u5) Color {
     return from5551(r, g, b, 1);
 }
 
-pub fn from5551(r: u5, g: u5, b: u5, a: u1) Self {
+pub fn from5551(r: u5, g: u5, b: u5, a: u1) Color {
     return .{
         .r = toByte(r),
         .g = toByte(g),
         .b = toByte(b),
         .a = if (a > 0) 0xff else 0,
+    };
+}
+
+pub fn from888(r: u8, g: u8, b: u8) Color {
+    return from8888(r, g, b, 0xff);
+}
+
+pub fn from8888(r: u8, g: u8, b: u8, a: u8) Color {
+    const qr = r >> 3;
+    const qg = g >> 3;
+    const qb = b >> 3;
+    const qa = a >> 7;
+    return .{
+        .r = (qr << 3) | (qr >> 2),
+        .g = (qg << 3) | (qg >> 2),
+        .b = (qb << 3) | (qb >> 2),
+        .a = if (qa > 0) 0xff else 0,
     };
 }
 
