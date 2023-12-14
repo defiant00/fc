@@ -151,7 +151,10 @@ pub fn deinit(self: Self) void {
 }
 
 fn getFrame() u64 {
-    return lib.SDL_GetTicks64() * RENDER_FPS / 1000;
+    const t = lib.SDL_GetTicks64();
+    std.debug.print("{d} -> {d}\n", .{ t, t * RENDER_FPS / 1000 });
+
+    return t * RENDER_FPS / 1000;
 }
 
 pub fn clear(self: Self) !void {
@@ -263,17 +266,6 @@ pub fn step(self: *Self) bool {
     const res = cur_frame != self.frame;
     self.frame = cur_frame;
     return res;
-    // const cur_frame = getFrame();
-    // const frame_diff = cur_frame - self.frame;
-    // if (frame_diff == 1) {
-    //     self.frame = cur_frame;
-    //     return true;
-    // }
-    // if (frame_diff > 1) {
-    //     self.frame = cur_frame - 2;
-    //     return true;
-    // }
-    // return false;
 }
 
 pub fn testDraw(self: *Self) !void {
