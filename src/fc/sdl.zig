@@ -260,16 +260,20 @@ pub fn setColor(self: Self, c: Color) !void {
 
 pub fn step(self: *Self) bool {
     const cur_frame = getFrame();
-    const frame_diff = cur_frame - self.frame;
-    if (frame_diff == 1) {
-        self.frame = cur_frame;
-        return true;
-    }
-    if (frame_diff > 1) {
-        self.frame = cur_frame - 2;
-        return true;
-    }
-    return false;
+    const res = cur_frame != self.frame;
+    self.frame = cur_frame;
+    return res;
+    // const cur_frame = getFrame();
+    // const frame_diff = cur_frame - self.frame;
+    // if (frame_diff == 1) {
+    //     self.frame = cur_frame;
+    //     return true;
+    // }
+    // if (frame_diff > 1) {
+    //     self.frame = cur_frame - 2;
+    //     return true;
+    // }
+    // return false;
 }
 
 pub fn testDraw(self: *Self) !void {
