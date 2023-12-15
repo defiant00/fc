@@ -38,6 +38,9 @@ pub fn main() !void {
 
         if (sdl_inst.step()) {
             // todo
+            std.debug.print("_", .{});
+        } else {
+            std.debug.print("s", .{});
         }
 
         try sdl_inst.toFramebuffer();
