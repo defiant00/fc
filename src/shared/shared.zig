@@ -1,2 +1,2 @@
-pub const Color = @import("Color.zig");
+pub const Color = @import("color.zig");
 pub const graphics = @embedFile("graphics.g16");
