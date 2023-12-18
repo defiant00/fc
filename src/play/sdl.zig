@@ -150,6 +150,12 @@ pub fn deinit(self: Self) void {
     lib.SDL_Quit();
 }
 
+fn getBufferColor(buffer: []const u8, index: usize) !Color {
+    if (index + 1 >= buffer.len) return error.InvalidColorFormat;
+    const c: u16 = buffer[index] | (@as(u16, buffer[index + 1]) << 8);
+    return Color.from16(c);
+}
+
 fn getFrame() u64 {
     return lib.SDL_GetTicks64() * RENDER_FPS / 1000;
 }
@@ -161,36 +167,107 @@ pub fn clear(self: Self) !void {
     }
 }
 
+pub fn fillRect(self: Self, rect: lib.SDL_Rect) !void {
+    if (lib.SDL_RenderFillRect(self.renderer, &rect) != 0) {
+        lib.SDL_Log("Unable to fill rectangle: %s", lib.SDL_GetError());
+        return error.SDLError;
+    }
+}
+
 pub fn present(self: Self) void {
     lib.SDL_RenderPresent(self.renderer);
 }
 
 pub fn print(self: Self, x: u16, y: u16, text: []const u8) !void {
-    var src = lib.SDL_Rect{ .x = 0, .y = VRAM_HEIGHT, .w = 8, .h = 16 };
-    var dest = lib.SDL_Rect{ .x = x, .y = y, .w = 8, .h = 16 };
-    for (text) |c| {
-        switch (c) {
-            ' ' => dest.x += 8,
-            '\t' => dest.x += 16,
-            '\r' => dest.x = x,
-            '\n' => {
-                dest.x = x;
-                dest.y += 16;
-            },
-            else => {
-                src.x = if (c > ' ' and c <= 137) (@as(c_int, c) - ' ') * 8 else 0;
+    var draw_bg = false;
 
-                if (lib.SDL_RenderCopy(
-                    self.renderer,
-                    self.vram,
-                    &src,
-                    &dest,
-                ) != 0) {
-                    lib.SDL_Log("Unable to render text: %s", lib.SDL_GetError());
-                    return error.SDLError;
-                }
-                dest.x += 8;
-            },
+    var src = lib.SDL_Rect{ .x = 0, .y = VRAM_HEIGHT, .w = 3, .h = 7 };
+    var dest = lib.SDL_Rect{ .x = x, .y = y, .w = 3, .h = 7 };
+    var bg = lib.SDL_Rect{ .x = x, .y = y, .w = 4, .h = 7 };
+    {
+        var i: usize = 0;
+        while (i < text.len) : (i += 1) {
+            const c = text[i];
+            switch (c) {
+                1 => {
+                    // set foreground color
+                    const fc = try getBufferColor(text, i + 1);
+                    try self.tint(fc);
+                    i += 2;
+                },
+                2 => {
+                    // set background color
+                    const bc = try getBufferColor(text, i + 1);
+                    try self.setColor(bc);
+                    draw_bg = true;
+                    i += 2;
+                },
+                3 => {
+                    // set both colors
+                    const fc = try getBufferColor(text, i + 1);
+                    const bc = try getBufferColor(text, i + 3);
+                    try self.tint(fc);
+                    try self.setColor(bc);
+                    draw_bg = true;
+                    i += 4;
+                },
+                4 => {
+                    // reset foreground color
+                    try self.tint(Color.white);
+                },
+                5 => {
+                    // reset background color (disable background)
+                    draw_bg = false;
+                },
+                6 => {
+                    // reset both colors
+                    try self.tint(Color.white);
+                    draw_bg = false;
+                },
+                ' ' => {
+                    dest.x += 4;
+                    bg.w = 4;
+                    if (draw_bg) try fillRect(self, bg);
+                },
+                '\t' => {
+                    dest.x += 8;
+                    bg.w = 8;
+                    if (draw_bg) try fillRect(self, bg);
+                },
+                '\r' => dest.x = x,
+                '\n' => {
+                    dest.x = x;
+                    dest.y += 8;
+                },
+                else => {
+                    if (c > ' ' and c < 127) {
+                        src.x = (@as(c_int, c) - ' ') * 4;
+                        src.w = 3;
+                    } else if (c >= 127 and c < 138) {
+                        src.x = 380 + (@as(c_int, c) - 127) * 8;
+                        src.w = 7;
+                    } else {
+                        src.x = 0;
+                        src.w = 3;
+                    }
+                    dest.w = src.w;
+                    bg.w = src.w + 1;
+                    if (draw_bg) try fillRect(self, bg);
+
+                    if (lib.SDL_RenderCopy(
+                        self.renderer,
+                        self.vram,
+                        &src,
+                        &dest,
+                    ) != 0) {
+                        lib.SDL_Log("Unable to render text: %s", lib.SDL_GetError());
+                        return error.SDLError;
+                    }
+                    dest.x += src.w + 1;
+                },
+            }
+            bg.x = dest.x;
+            bg.y = dest.y;
         }
     }
 }
@@ -299,6 +376,11 @@ pub fn testDraw(self: *Self) !void {
         lib.SDL_Log("Unable to render from vram: %s", lib.SDL_GetError());
         return error.SDLError;
     }
+
+    try self.tint(Color.white);
+    try self.print(260, 8, "\x01\x1f\xfcHEY \x02\x00\xfcYOU, \x03\x1f\x82\xff\x83MORE \x05PARTIAL \x04RESET \x03\x1f\x82\xff\x83OKAY \x06FULL");
+    try self.print(260, 20, "\x06\x02\x02\x80a\x02\x04\x08b\x02\x06\x08c\x02\x08\x08d\x02\x0a\x08e\x02\x0c\x08f\x02\x0e\x08g\x02\x10\x08h\x02\x12\x08i\x02\x14\x08j\x02\x16\x08k\x02\x18\x08l\x02\x1a\x08m\x02\x1c\x08n\x02\x1e\x08o");
+    try self.print(260, 32, "\x06\x01\x00\x88a\x01\x00\x90b\x01\x00\x98c\x01\x00\xa0d\x01\x00\xa8e\x01\x00\xb0f\x01\x00\xb8g\x01\x00\xc0h\x01\x00\xc8i\x01\x00\xd0j\x01\x00\xd8k\x01\x00\xe0l\x01\x00\xe8m\x01\x00\xf0n\x01\x00\xf8o");
 
     try self.print(10, 180, "Hello, world!\nsome TEXT~ don't know...");
     try self.tint(Color.pico8[9]);
