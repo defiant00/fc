@@ -38,9 +38,10 @@ pub fn main() !void {
 
 fn play(alloc: Allocator, path: ?[:0]const u8) !void {
     // todo - load from path if not null
+    _ = alloc;
     _ = path;
 
-    var sdl_inst = try sdl.init(alloc);
+    var sdl_inst = try sdl.init();
     defer sdl_inst.deinit();
 
     var running = true;

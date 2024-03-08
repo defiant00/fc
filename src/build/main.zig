@@ -50,12 +50,10 @@ fn convertBitmap(alloc: Allocator, path: [:0]const u8) !void {
     const out_file = try std.fs.cwd().createFile(out_path, .{});
     defer out_file.close();
 
-    var comp = try std.compress.deflate.compressor(
-        alloc,
+    var comp = try std.compress.flate.compressor(
         out_file.writer(),
-        .{ .level = .best_compression },
+        .{ .level = .best },
     );
-    defer comp.deinit();
 
     if (lib.SDL_LockSurface(img) != 0) {
         lib.SDL_Log("Unable to lock surface: %s", lib.SDL_GetError());
@@ -82,8 +80,6 @@ fn convertBitmap(alloc: Allocator, path: [:0]const u8) !void {
         const uc = shared.Color.to5551(r, g, b, a);
         try writer.writeInt(u16, uc, .little);
     }
-
-    try comp.close();
 
     lib.SDL_UnlockSurface(img);
     lib.SDL_FreeSurface(img);

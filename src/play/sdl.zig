@@ -37,10 +37,10 @@ screen_rect: lib.SDL_Rect,
 screen_scale: f32,
 blend_modes: [3]BlendMode,
 
-pub fn init(alloc: std.mem.Allocator) !Self {
+pub fn init() !Self {
     // VRAM
     var gr_buffer = std.io.fixedBufferStream(shared.graphics);
-    var dec = try std.compress.deflate.decompressor(alloc, gr_buffer.reader(), null);
+    var dec = std.compress.flate.decompressor(gr_buffer.reader());
     var dec_r = dec.reader();
     const w: usize = try dec_r.readInt(u16, .little);
     const h: usize = try dec_r.readInt(u16, .little);
@@ -78,9 +78,6 @@ pub fn init(alloc: std.mem.Allocator) !Self {
         }
     }
     lib.SDL_UnlockSurface(vram_surf);
-
-    if (dec.close()) |e| return e;
-    dec.deinit();
 
     // SDL
     if (lib.SDL_Init(lib.SDL_INIT_VIDEO) != 0) {

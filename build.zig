@@ -25,8 +25,20 @@ pub fn build(b: *std.Build) void {
     play_exe.root_module.addImport("shared", shared);
     build_exe.root_module.addImport("shared", shared);
 
+    // SDL2
+    const sdl_path = "C:\\libs\\SDL2-2.30.1\\";
+    play_exe.addIncludePath(.{ .path = sdl_path ++ "include" });
+    build_exe.addIncludePath(.{ .path = sdl_path ++ "include" });
+    play_exe.addLibraryPath(.{ .path = sdl_path ++ "lib\\x64" });
+    build_exe.addLibraryPath(.{ .path = sdl_path ++ "lib\\x64" });
+    play_exe.linkSystemLibrary("SDL2");
+    build_exe.linkSystemLibrary("SDL2");
+    play_exe.linkLibC();
+    build_exe.linkLibC();
+
     b.installArtifact(play_exe);
     b.installArtifact(build_exe);
+    b.installBinFile(sdl_path ++ "lib\\x64\\SDL2.dll", "SDL2.dll");
 
     const play_cmd = b.addRunArtifact(play_exe);
     const build_cmd = b.addRunArtifact(build_exe);
