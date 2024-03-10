@@ -84,6 +84,8 @@ fn convertBitmap(alloc: Allocator, path: [:0]const u8) !void {
     lib.SDL_UnlockSurface(img);
     lib.SDL_FreeSurface(img);
 
+    try comp.finish();
+
     std.debug.print("  Done\n", .{});
 }
 
